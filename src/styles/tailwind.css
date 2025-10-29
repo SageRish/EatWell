@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* small helper: body reset for extension UIs */
+html, body, #root { height: 100%; margin: 0; }
