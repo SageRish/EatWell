@@ -21,6 +21,8 @@ export type RecipeSidebarProps = {
   state?: SidebarState
   title?: string
   summary?: string[]
+  ingredients?: string[]
+  instructions?: string[]
   nutrition?: NutritionSummary
   alerts?: AlertItem[]
   onRescale?: () => void
@@ -35,6 +37,8 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   state = 'loading',
   title = 'Recipe Title',
   summary = [],
+  ingredients = [],
+  instructions = [],
   nutrition,
   alerts = [],
   onRescale,
@@ -86,6 +90,38 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
               <p className="text-sm text-gray-500">No summary available.</p>
             )}
           </section>
+
+            <section aria-label="ingredients" className="mt-4">
+              <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Ingredients</h3>
+              <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
+                <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full ingredient list ({ingredients.length})</summary>
+                {ingredients.length ? (
+                  <ul className="list-disc list-inside mt-2 text-sm text-gray-700 dark:text-gray-300">
+                    {ingredients.map((ing, idx) => (
+                      <li key={idx}>{ing}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-500 mt-2">No ingredients detected.</div>
+                )}
+              </details>
+            </section>
+
+            <section aria-label="full-recipe" className="mt-4">
+              <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Full recipe</h3>
+              <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
+                <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full recipe instructions ({instructions.length} steps)</summary>
+                {instructions.length ? (
+                  <ol className="list-decimal list-inside mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    {instructions.map((st, idx) => (
+                      <li key={idx}>{st}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="text-sm text-gray-500 mt-2">No instructions detected.</div>
+                )}
+              </details>
+            </section>
 
           <section aria-label="nutrition" className="text-sm">
             <h3 className="font-medium text-gray-800 dark:text-gray-200">Nutrition</h3>

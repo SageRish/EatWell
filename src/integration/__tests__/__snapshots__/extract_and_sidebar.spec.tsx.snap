@@ -34,6 +34,58 @@ exports[`integration: extract recipe and render sidebar > extracts recipe from J
         </p>
       </section>
       <section
+        aria-label="ingredients"
+        class="mt-4"
+      >
+        <h3
+          class="font-medium text-gray-800 dark:text-gray-200 mb-2"
+        >
+          Ingredients
+        </h3>
+          <details
+            class="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2"
+          >
+            <summary
+              class="cursor-pointer font-medium text-gray-800 dark:text-gray-100"
+            >
+            Show full ingredient list (
+            0
+            )
+          </summary>
+          <div
+            class="text-sm text-gray-500 mt-2"
+          >
+            No ingredients detected.
+          </div>
+        </details>
+      </section>
+      <section
+        aria-label="full-recipe"
+        class="mt-4"
+      >
+        <h3
+          class="font-medium text-gray-800 dark:text-gray-200 mb-2"
+        >
+          Full recipe
+        </h3>
+          <details
+            class="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2"
+          >
+            <summary
+              class="cursor-pointer font-medium text-gray-800 dark:text-gray-100"
+            >
+            Show full recipe instructions (
+            0
+             steps)
+          </summary>
+          <div
+            class="text-sm text-gray-500 mt-2"
+          >
+            No instructions detected.
+          </div>
+        </details>
+      </section>
+      <section
         aria-label="nutrition"
         class="text-sm"
       >

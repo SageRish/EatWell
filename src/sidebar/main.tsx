@@ -16,28 +16,78 @@ const demoAlerts: AlertItem[] = [
 ]
 
 const rootEl = document.getElementById('root')!
-function DemoApp() {
+
+function SidebarApp() {
+  const [state, setState] = React.useState<'loading' | 'error' | 'ready'>('loading')
+  const [recipe, setRecipe] = React.useState<any | null>(null)
   const [privacy, setPrivacy] = React.useState(false)
+
+  React.useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const sourceTabId = p.get('sourceTabId') ? Number(p.get('sourceTabId')) : null
+
+    const fetchFromTab = async (tabId?: number | null) => {
+      try {
+        const c: any = (window as any).chrome
+        let resp: any = null
+        if (tabId && c && c.tabs && c.tabs.sendMessage) {
+          resp = await new Promise((res) => c.tabs.sendMessage(tabId, { action: 'get_extracted_recipe' }, (r: any) => res(r)))
+        } else if (c && c.tabs && c.tabs.query) {
+          const tabs = await new Promise<any[]>((res) => c.tabs.query({ active: true, currentWindow: true }, res))
+          const tid = tabs && tabs[0] && tabs[0].id
+          if (tid) resp = await new Promise((res) => c.tabs.sendMessage(tid, { action: 'get_extracted_recipe' }, (r: any) => res(r)))
+        }
+
+        if (resp && resp.ok && resp.recipe) {
+          setRecipe(resp.recipe)
+          setState('ready')
+        } else {
+          setState('error')
+        }
+      } catch (e) {
+        setState('error')
+      }
+    }
+
+    fetchFromTab(sourceTabId)
+  }, [])
+
+  const summary = React.useMemo(() => {
+    if (!recipe) return []
+    const parts: string[] = []
+    if (recipe.servings) parts.push(String(recipe.servings))
+    if (Array.isArray(recipe.instructionsRaw) && recipe.instructionsRaw.length) {
+      parts.push(...recipe.instructionsRaw.slice(0, 3))
+    } else if (Array.isArray(recipe.ingredientsRaw) && recipe.ingredientsRaw.length) {
+      parts.push(`${recipe.ingredientsRaw.length} ingredients`)
+    }
+    return parts
+  }, [recipe])
+
+  const alerts = React.useMemo(() => {
+    // placeholder: no model call here — we could call detectAllergens
+    // or other utils. For now return empty array.
+    return [] as any[]
+  }, [recipe])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-800 p-4">
       <Sidebar
-        state={getStateFromSearch()}
-        title={"Grandma's Pancakes"}
-        summary={[
-          'Fluffy pancakes made with a hint of vanilla',
-          'Takes 20 minutes',
-          'Family-friendly and easily doubled'
-        ]}
-        nutrition={{ calories: 420, fat: '12g', carbs: '58g', protein: '8g' }}
-        alerts={demoAlerts}
+        state={state}
+        title={recipe?.title || 'Recipe'}
+        summary={summary}
+        ingredients={recipe?.ingredientsRaw || []}
+        instructions={recipe?.instructionsRaw || []}
+        nutrition={undefined}
+        alerts={alerts}
         onRescale={() => alert('Rescale clicked')}
         onLocalize={() => alert('Localize clicked')}
         onSuggestAlternatives={() => alert('Suggest Alternatives clicked')}
         privacyEnabled={privacy}
-        onTogglePrivacy={(v) => { setPrivacy(v); alert(`Privacy mode ${v ? 'enabled' : 'disabled'}`) }}
+        onTogglePrivacy={(v) => { setPrivacy(v); /* optional: persist */ }}
       />
     </div>
   )
 }
 
-createRoot(rootEl).render(<DemoApp />)
+createRoot(rootEl).render(<SidebarApp />)

@@ -323,72 +323,63 @@ try {
   window.postMessage(failure, '*')
 }
 
-// Wire up runtime message listener for highlighting from extension (sidebar)
+// Wire up runtime message listener for highlighting and recipe queries from the
+// extension (sidebar/popup). We register a single top-level listener so handlers
+// are available as soon as the content script runs (previously the recipe
+// handler was only registered inside another listener and thus wasn't active).
 try {
-  // dynamic import to avoid type issues and keep the module lazy
   ;(async () => {
-    const highlighter = await import('./content/highlighter')
+      // Avoid dynamic `import()` here because the Vite runtime inserts
+      // import.meta usage which throws when the content script is executed
+      // in a non-module environment (some pages). Instead, look for a
+      // highlighter attached to window by an injected script, or skip it.
+      // This keeps the content script safe from `import.meta` SyntaxError.
+      const highlighter: any = (window as any).__EATWELL_HIGHLIGHTER || null
+
     const ext = (window as any).chrome
     if (ext && ext.runtime && ext.runtime.onMessage) {
       ext.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
         try {
-          if (!msg || !msg.action) return
+          if (!msg || !msg.action) return false
+
           if (msg.action === 'eatwell_highlight') {
             const entries = msg.entries || []
-            const res = highlighter.highlightDetections(entries)
+            const res = highlighter && highlighter.highlightDetections ? highlighter.highlightDetections(entries) : null
             sendResponse && sendResponse({ ok: true, result: res })
-          } else if (msg.action === 'eatwell_clear_highlights') {
-            highlighter.clearHighlights()
+            return true
+          }
+
+          if (msg.action === 'eatwell_clear_highlights') {
+            if (highlighter && highlighter.clearHighlights) highlighter.clearHighlights()
             sendResponse && sendResponse({ ok: true })
+            return true
+          }
+
+          if (msg.action === 'get_extracted_recipe') {
+            try {
+              const existing = (window as any).__EATWELL_RECIPE
+              if (existing) {
+                sendResponse({ ok: true, recipe: existing })
+                return true
+              }
+              const fresh = extractRecipe()
+              ;(window as any).__EATWELL_RECIPE = fresh
+              sendResponse({ ok: true, recipe: fresh })
+              return true
+            } catch (err) {
+              sendResponse({ ok: false, error: String(err) })
+              return true
+            }
           }
         } catch (e) {
           sendResponse && sendResponse({ ok: false, error: String(e) })
-        }
-        // indicate we'll call sendResponse asynchronously if needed
-
-      // Respond to requests from the popup or other extension pages asking for the
-      // currently extracted recipe. This allows the popup to display the same data
-      // the content script extracted.
-      try {
-        const respondWithRecipe = (sendResponse: any) => {
-          try {
-            const existing = (window as any).__EATWELL_RECIPE
-            if (existing) {
-              sendResponse({ ok: true, recipe: existing })
-              return true
-            }
-            // if no existing extraction, run a fresh extraction
-            const fresh = extractRecipe()
-            ;(window as any).__EATWELL_RECIPE = fresh
-            sendResponse({ ok: true, recipe: fresh })
-            return true
-          } catch (err) {
-            sendResponse({ ok: false, error: String(err) })
-            return true
-          }
+          return true
         }
 
-        const ext = (window as any).chrome
-        if (ext && ext.runtime && ext.runtime.onMessage) {
-          ext.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
-            try {
-              if (!msg || !msg.action) return
-              if (msg.action === 'get_extracted_recipe') {
-                return respondWithRecipe(sendResponse)
-              }
-            } catch (e) {
-              // ignore
-            }
-            return false
-          })
-        }
-      } catch (e) {
-        // ignore
-      }
-        return true
+        return false
       })
     }
   })()
 } catch (e) {
-  // non-fatal: if highlighter import fails, ignore
+  // non-fatal: ignore
 }

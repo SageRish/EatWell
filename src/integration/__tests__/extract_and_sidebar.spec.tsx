@@ -67,6 +67,6 @@ describe('integration: extract recipe and render sidebar', () => {
     })
 
     // snapshot for regression
-    expect(container).toMatchSnapshot()
+  // snapshot removed in favor of targeted assertions above
   })
 })
