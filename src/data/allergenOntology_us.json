@@ -1,0 +1,14 @@
+{
+  "region": "US",
+  "synonyms": {
+    "peanut butter": ["peanut butter", "peanut-butter", "peanutpaste"],
+    "all-purpose flour": ["all purpose flour", "all purpose", "ap flour"],
+    "wheat flour": ["wheat flour", "plain flour"],
+    "soy sauce": ["soy sauce", "shoyu"],
+    "sesame oil": ["sesame oil", "toasted sesame oil"],
+    "mustard seeds": ["mustard seeds", "yellow mustard seeds", "brown mustard seeds"],
+    "lupin flour": ["lupin flour", "lupin"],
+    "shrimp": ["shrimp", "prawns"],
+    "peanuts": ["peanuts"]
+  }
+}

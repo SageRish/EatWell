@@ -45,4 +45,11 @@
     "https://cooking.nytimes.com/*",
     "https://www.tasteofhome.com/*"
   ]
+  ,
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar/index.html", "sidebar/*.js", "sidebar/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "description": "Core allergen ontology mapping canonical ingredient tokens to allergen categories and category synonyms.",
+  "categories": {
+    "peanut": { "id": "peanut", "labels": ["peanut"] },
+    "tree-nut": { "id": "tree-nut", "labels": ["tree-nut", "tree nut", "nut", "nuts"] },
+    "dairy": { "id": "dairy", "labels": ["dairy", "milk", "butter", "cheese"] },
+    "gluten": { "id": "gluten", "labels": ["gluten", "wheat", "flour"] },
+    "soy": { "id": "soy", "labels": ["soy", "soya"] },
+    "shellfish": { "id": "shellfish", "labels": ["shellfish", "shrimp", "prawn", "crab", "lobster"] },
+    "egg": { "id": "egg", "labels": ["egg"] },
+    "sesame": { "id": "sesame", "labels": ["sesame"] },
+    "mustard": { "id": "mustard", "labels": ["mustard"] },
+    "lupin": { "id": "lupin", "labels": ["lupin"] }
+  },
+  "ingredientMap": {
+    "peanut butter": "peanut",
+    "peanuts": "peanut",
+    "peanut": "peanut",
+
+    "almond": "tree-nut",
+    "almonds": "tree-nut",
+    "almond milk": "tree-nut",
+    "walnut": "tree-nut",
+    "cashew": "tree-nut",
+    "pecan": "tree-nut",
+
+    "milk": "dairy",
+    "butter": "dairy",
+    "cheese": "dairy",
+    "yogurt": "dairy",
+
+    "wheat": "gluten",
+    "wheat flour": "gluten",
+    "all-purpose flour": "gluten",
+    "bread": "gluten",
+
+    "soy sauce": "soy",
+    "soy": "soy",
+    "tofu": "soy",
+
+    "shrimp": "shellfish",
+    "prawn": "shellfish",
+    "crab": "shellfish",
+    "lobster": "shellfish",
+
+    "egg": "egg",
+    "egg yolk": "egg",
+
+    "sesame": "sesame",
+    "sesame oil": "sesame",
+    "tahini": "sesame",
+
+    "mustard": "mustard",
+    "mustard seeds": "mustard",
+
+    "lupin": "lupin",
+    "lupin flour": "lupin"
+  },
+  "notes": "This file contains canonical mappings. For region-specific synonyms, see allergenOntology_us.json"
+}
