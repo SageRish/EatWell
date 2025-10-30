@@ -26,6 +26,8 @@ export type RecipeSidebarProps = {
   onRescale?: () => void
   onLocalize?: () => void
   onSuggestAlternatives?: () => void
+  privacyEnabled?: boolean
+  onTogglePrivacy?: (v: boolean) => void
   className?: string
 }
 
@@ -38,6 +40,8 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   onRescale,
   onLocalize,
   onSuggestAlternatives,
+  privacyEnabled = false,
+  onTogglePrivacy,
   className = ''
 }) => {
   return (
@@ -134,6 +138,19 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
               >
                 Rescale
               </button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded">
+                <label className="text-sm">Privacy mode</label>
+                <button
+                  onClick={() => onTogglePrivacy && onTogglePrivacy(!privacyEnabled)}
+                  className={`ml-2 w-12 h-6 rounded-full p-0 ${privacyEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                  aria-pressed={privacyEnabled}
+                >
+                  <span
+                    className={`block w-5 h-5 bg-white rounded-full transform transition-transform ${privacyEnabled ? 'translate-x-6' : 'translate-x-0'}`}
+                    aria-hidden
+                  />
+                </button>
+              </div>
               <button
                 onClick={onLocalize}
                 className="px-3 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"

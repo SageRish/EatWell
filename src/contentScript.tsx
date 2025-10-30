@@ -322,3 +322,33 @@ try {
   const failure = { source: 'eatwell-content-script', status: 'error', reason: String((err as any && (err as any).message) ? (err as any).message : err), recipe: fallback }
   window.postMessage(failure, '*')
 }
+
+// Wire up runtime message listener for highlighting from extension (sidebar)
+try {
+  // dynamic import to avoid type issues and keep the module lazy
+  ;(async () => {
+    const highlighter = await import('./content/highlighter')
+    const ext = (window as any).chrome
+    if (ext && ext.runtime && ext.runtime.onMessage) {
+      ext.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
+        try {
+          if (!msg || !msg.action) return
+          if (msg.action === 'eatwell_highlight') {
+            const entries = msg.entries || []
+            const res = highlighter.highlightDetections(entries)
+            sendResponse && sendResponse({ ok: true, result: res })
+          } else if (msg.action === 'eatwell_clear_highlights') {
+            highlighter.clearHighlights()
+            sendResponse && sendResponse({ ok: true })
+          }
+        } catch (e) {
+          sendResponse && sendResponse({ ok: false, error: String(e) })
+        }
+        // indicate we'll call sendResponse asynchronously if needed
+        return true
+      })
+    }
+  })()
+} catch (e) {
+  // non-fatal: if highlighter import fails, ignore
+}

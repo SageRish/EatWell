@@ -16,21 +16,28 @@ const demoAlerts: AlertItem[] = [
 ]
 
 const rootEl = document.getElementById('root')!
-createRoot(rootEl).render(
-  <div className="min-h-screen bg-gray-50 dark:bg-gray-800 p-4">
-    <Sidebar
-      state={getStateFromSearch()}
-      title={"Grandma's Pancakes"}
-      summary={[
-        'Fluffy pancakes made with a hint of vanilla',
-        'Takes 20 minutes',
-        'Family-friendly and easily doubled'
-      ]}
-      nutrition={{ calories: 420, fat: '12g', carbs: '58g', protein: '8g' }}
-      alerts={demoAlerts}
-      onRescale={() => alert('Rescale clicked')}
-      onLocalize={() => alert('Localize clicked')}
-      onSuggestAlternatives={() => alert('Suggest Alternatives clicked')}
-    />
-  </div>
-)
+function DemoApp() {
+  const [privacy, setPrivacy] = React.useState(false)
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-800 p-4">
+      <Sidebar
+        state={getStateFromSearch()}
+        title={"Grandma's Pancakes"}
+        summary={[
+          'Fluffy pancakes made with a hint of vanilla',
+          'Takes 20 minutes',
+          'Family-friendly and easily doubled'
+        ]}
+        nutrition={{ calories: 420, fat: '12g', carbs: '58g', protein: '8g' }}
+        alerts={demoAlerts}
+        onRescale={() => alert('Rescale clicked')}
+        onLocalize={() => alert('Localize clicked')}
+        onSuggestAlternatives={() => alert('Suggest Alternatives clicked')}
+        privacyEnabled={privacy}
+        onTogglePrivacy={(v) => { setPrivacy(v); alert(`Privacy mode ${v ? 'enabled' : 'disabled'}`) }}
+      />
+    </div>
+  )
+}
+
+createRoot(rootEl).render(<DemoApp />)

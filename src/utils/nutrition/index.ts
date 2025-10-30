@@ -2,8 +2,13 @@ import config from '../../../src/config/nutritionConfig'
 import { NutritionResult, Per100g } from './types'
 import * as mock from './providers/mockProvider'
 import * as usda from './providers/usdaProvider'
+import privacy from '../privacy'
 
 async function providerLookup(name: string): Promise<NutritionResult | null> {
+  // If privacy mode is enabled, always prefer local mock provider
+  if (privacy && privacy.isPrivacyMode && privacy.isPrivacyMode()) {
+    return await mock.lookupMock(name)
+  }
   if (config.provider === 'usda') {
     return await usda.lookupUsda(name)
   }
