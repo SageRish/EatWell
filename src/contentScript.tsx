@@ -124,7 +124,7 @@ function parseMicrodata(): Partial<Extracted> | null {
         const ingredients = ingEls.length ? ingEls.map(i => (i.textContent || '').trim()).filter(Boolean) : []
         // instructions can be itemprop=recipeInstructions with nested steps
         const instrEls = Array.from(el.querySelectorAll('[itemprop="recipeInstructions"]'))
-        let instructions: string[] = []
+        const instructions: string[] = []
         if (instrEls.length) {
           for (const ie of instrEls) {
             if (ie.querySelectorAll('li').length) {
@@ -154,7 +154,7 @@ function parseMicrodata(): Partial<Extracted> | null {
 
 function heuristics(): Extracted {
   // Title
-  let title = safeText(document.querySelector('h1')) || safeText(document.querySelector('title')) || document.title || null
+  const title = safeText(document.querySelector('h1')) || safeText(document.querySelector('title')) || document.title || null
 
   // Find ingredient containers by class/id keywords
   const ingSelectors = [
@@ -163,7 +163,7 @@ function heuristics(): Extracted {
     '[class*="ingredients"]',
     '[id*="ingredients"]'
   ]
-  let ingredients: string[] = []
+  const ingredients: string[] = []
   for (const sel of ingSelectors) {
     const nodes = Array.from(document.querySelectorAll(sel))
     for (const node of nodes) {
@@ -192,7 +192,7 @@ function heuristics(): Extracted {
     '[id*="method"]',
     'ol[class*="step"], ol[class*="instruction"], ol[class*="directions"], ol'
   ]
-  let instructions: string[] = []
+  const instructions: string[] = []
   for (const sel of instrSelectors) {
     const nodes = Array.from(document.querySelectorAll(sel))
     for (const node of nodes) {
@@ -345,6 +345,46 @@ try {
           sendResponse && sendResponse({ ok: false, error: String(e) })
         }
         // indicate we'll call sendResponse asynchronously if needed
+
+      // Respond to requests from the popup or other extension pages asking for the
+      // currently extracted recipe. This allows the popup to display the same data
+      // the content script extracted.
+      try {
+        const respondWithRecipe = (sendResponse: any) => {
+          try {
+            const existing = (window as any).__EATWELL_RECIPE
+            if (existing) {
+              sendResponse({ ok: true, recipe: existing })
+              return true
+            }
+            // if no existing extraction, run a fresh extraction
+            const fresh = extractRecipe()
+            ;(window as any).__EATWELL_RECIPE = fresh
+            sendResponse({ ok: true, recipe: fresh })
+            return true
+          } catch (err) {
+            sendResponse({ ok: false, error: String(err) })
+            return true
+          }
+        }
+
+        const ext = (window as any).chrome
+        if (ext && ext.runtime && ext.runtime.onMessage) {
+          ext.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any) => {
+            try {
+              if (!msg || !msg.action) return
+              if (msg.action === 'get_extracted_recipe') {
+                return respondWithRecipe(sendResponse)
+              }
+            } catch (e) {
+              // ignore
+            }
+            return false
+          })
+        }
+      } catch (e) {
+        // ignore
+      }
         return true
       })
     }

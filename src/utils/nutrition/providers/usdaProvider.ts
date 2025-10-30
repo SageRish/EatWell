@@ -1,9 +1,12 @@
 import { NutritionResult, Per100g } from '../types'
 import config from '../../../config/nutritionConfig'
+import prefs from '../../prefs/storage'
 
 async function fetchFoodByName(name: string): Promise<any | null> {
   // USDA FoodData Central search endpoint
-  const apiKey = config.usdaApiKey
+  // Do not rely on a build-time embedded key. Prefer a user-provided key stored in prefs.
+  const p = await prefs.getPrefs()
+  const apiKey = p.usdaApiKey || config.usdaApiKey
   if (!apiKey) return null
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(name)}&pageSize=1`
   const res = await fetch(url)

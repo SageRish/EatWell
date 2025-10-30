@@ -23,6 +23,14 @@ export type Prefs = {
   allergens: string[]
   locale: string
   dietaryGoals: DietaryGoals
+  // whether user completed first-run onboarding
+  hasSeenOnboarding?: boolean
+  // telemetry / anonymous usage opt-in
+  telemetryOptIn?: boolean
+  // USDA API key provided by the user via Options. Never hardcode provider keys in source.
+  usdaApiKey?: string
+  // privacy mode (prevent external calls / persistent writes)
+  privacyMode?: boolean
 }
 
 const STORAGE_KEY = 'eatwell_prefs_v1'
@@ -31,6 +39,10 @@ export const DEFAULT_PREFS: Prefs = {
   allergens: [],
   locale: 'en-us',
   dietaryGoals: {}
+  , hasSeenOnboarding: false
+  , telemetryOptIn: false
+  , usdaApiKey: undefined
+  , privacyMode: false
 }
 
 function hasChromeStorage(): boolean {

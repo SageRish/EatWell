@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         popup: path.resolve(__dirname, 'src/popup/index.html'),
-        sidebar: path.resolve(__dirname, 'src/sidebar/index.html'),
+  sidebar: path.resolve(__dirname, 'src/sidebar/index.html'),
+  options: path.resolve(__dirname, 'src/options/index.html'),
         // background and content are built as entry points
         background: path.resolve(__dirname, 'src/background.ts'),
         content: path.resolve(__dirname, 'src/contentScript.tsx')

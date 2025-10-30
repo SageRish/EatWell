@@ -57,7 +57,7 @@ function findDensity(ingredientName: string, densityMap?: Record<string, number>
 export function convertUnits(input: ParsedIngredient, densityMap?: Record<string, number>): ConversionResult {
   const qtyRaw = input.quantity
   let qtyNum: number | null = null
-  let noteParts: string[] = []
+  const noteParts: string[] = []
 
   if (typeof qtyRaw === 'number') qtyNum = qtyRaw
   else if (typeof qtyRaw === 'string') {
