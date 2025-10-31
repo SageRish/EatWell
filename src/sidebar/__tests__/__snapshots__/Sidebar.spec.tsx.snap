@@ -104,30 +104,26 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
         aria-label="nutrition"
         class="text-sm"
       >
-        <h3
-          class="font-medium text-gray-800 dark:text-gray-200"
-        >
-          Nutrition
-        </h3>
         <div
-          class="mt-2 text-gray-700 dark:text-gray-300"
+          class="flex items-center justify-between"
         >
+          <h3
+            class="font-medium text-gray-800 dark:text-gray-200"
+          >
+            Nutrition
+          </h3>
           <div>
-            Calories: 
-            420
+            <button
+              class="px-2 py-1 text-xs bg-orange-600 text-white rounded"
+            >
+              Get Nutrition
+            </button>
           </div>
-          <div>
-            Fat: 
-            10g
-          </div>
-          <div>
-            Carbs: 
-            50g
-          </div>
-          <div>
-            Protein: 
-            12g
-          </div>
+        </div>
+        <div
+          class="mt-2 text-gray-500"
+        >
+          No nutrition data. Click "Get Nutrition" to estimate nutrition using the Gemini API.
         </div>
       </section>
       <section

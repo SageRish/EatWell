@@ -43,7 +43,7 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   summary = [],
   ingredients = [],
   instructions = [],
-  nutrition,
+  
   alerts = [],
   onRescale,
   onSuggestAlternatives,
@@ -60,6 +60,8 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [modelAlerts, setModelAlerts] = useState<AlertItem[]>([])
   const [detectingAllergens, setDetectingAllergens] = useState(false)
+  const [calculatingNutrition, setCalculatingNutrition] = useState(false)
+  const [nutritionResult, setNutritionResult] = useState<any | null>(null)
 
   async function injectOriginTrial(token?: string) {
     if (!token) return null
@@ -342,6 +344,102 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       setDetectingAllergens(false)
     }
   }
+
+  function extractCookingMethods(instrs: string[]) {
+    const methods = ['bake', 'roast', 'grill', 'fry', 'deep fry', 'deep-fry', 'saute', 'sauté', 'simmer', 'boil', 'steam', 'air fry', 'air-fry', 'braise']
+    const found = new Set<string>()
+    for (const s of instrs || []) {
+      const low = (s || '').toLowerCase()
+      for (const m of methods) if (low.includes(m)) found.add(m)
+    }
+    return Array.from(found)
+  }
+
+  function buildNutritionPrompt(ingredientsList: Array<{quantity?: string; unit?: string; name: string}>, instructions: string[]) {
+    const ingredientsText = ingredientsList.map(i => `${i.quantity ?? ''} ${i.unit ?? ''} ${i.name}`).join('\n')
+    const methods = extractCookingMethods(instructions)
+    const prompt = `You are a nutrition analysis assistant. Given the ingredient list (with quantities & units) and the cooking methods for a recipe, return a single JSON object exactly matching this schema:\n{\n  "servings": number,\n  "totalCalories": number,\n  "totals": { "calories": number, "fat_g": number, "carbs_g": number, "protein_g": number, "fiber_g": number, "sugar_g": number, "sodium_mg": number },\n  "micronutrients": { "calcium_mg": number, "iron_mg": number, "potassium_mg": number, "vitamin_c_mg": number }\n}\nOnly return JSON and nothing else. Use best-effort nutritional estimates based on common food composition tables. If quantity or unit is missing, make a reasonable default assumption. Include the cooking methods in your reasoning but return only the JSON.\n\nIngredients:\n${ingredientsText}\n\nCooking methods:\n${methods.join(', ')}`
+    return prompt
+  }
+
+  async function getNutritionAnalysis() {
+    if (!ingredients || ingredients.length === 0) return
+    setCalculatingNutrition(true)
+    try {
+  const p = await prefs.getPrefs()
+      const apiKey = (p as any).geminiApiKey || (p as any).usdaApiKey
+      if (!apiKey) {
+        window.alert('No Gemini API key found in Options. Please add your API key in Options before requesting nutrition.');
+        return
+      }
+
+      // build ingredient list objects
+      const ingredientsList = ingredients.map((ing, idx) => {
+        const ci = cleanedIngredients[idx]
+        if (ci && ci.ingredientName) return { quantity: ci.quantity || '', unit: ci.unit || '', name: ci.ingredientName }
+        const parsed = parseIngredient(ing || '')
+        return { quantity: parsed.quantity != null ? String(parsed.quantity) : '', unit: parsed.unit || '', name: parsed.ingredientName || ing }
+      })
+
+      const prompt = buildNutritionPrompt(ingredientsList, instructions)
+
+      const body = {
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          thinkingConfig: { thinkingBudget: 0 },
+          responseMimeType: 'application/json'
+        }
+      }
+
+      const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify(body)
+      })
+
+      const data = await resp.json()
+      // try to extract text
+      let text = ''
+      try {
+        text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text
+      } catch {
+        text = ''
+      }
+      if (!text) {
+        // fallback: attempt other shapes
+        try { text = JSON.stringify(data) } catch { text = '' }
+      }
+
+      let parsed: any = null
+      try { parsed = JSON.parse(text) } catch {
+        // try to find JSON substring
+        const m = text.match(/\{[\s\S]*\}/)
+        if (m) try { parsed = JSON.parse(m[0]) } catch { parsed = null }
+      }
+
+      if (!parsed) {
+        window.alert('Nutrition API returned unexpected response. See console for details.')
+        console.log('Nutrition raw response', data)
+        return
+      }
+
+      setNutritionResult(parsed)
+    } catch (e) {
+      console.error('getNutritionAnalysis failed', e)
+      window.alert('Failed to calculate nutrition — see console for details')
+    } finally {
+      setCalculatingNutrition(false)
+    }
+  }
   return (
     <aside
       className={`max-w-md w-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-4 sm:p-6 ${className}`}
@@ -545,16 +643,40 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
             </section>
 
           <section aria-label="nutrition" className="text-sm">
-            <h3 className="font-medium text-gray-800 dark:text-gray-200">Nutrition</h3>
-            {nutrition ? (
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800 dark:text-gray-200">Nutrition</h3>
+              <div>
+                <button
+                  onClick={getNutritionAnalysis}
+                  disabled={calculatingNutrition}
+                  className="px-2 py-1 text-xs bg-orange-600 text-white rounded"
+                >
+                  {calculatingNutrition ? 'Calculating…' : 'Get Nutrition'}
+                </button>
+              </div>
+            </div>
+
+            {nutritionResult ? (
               <div className="mt-2 text-gray-700 dark:text-gray-300">
-                <div>Calories: {nutrition.calories ?? '—'}</div>
-                <div>Fat: {nutrition.fat ?? '—'}</div>
-                <div>Carbs: {nutrition.carbs ?? '—'}</div>
-                <div>Protein: {nutrition.protein ?? '—'}</div>
+                <div>Servings: {nutritionResult.servings ?? '—'}</div>
+                <div>Total calories: {nutritionResult.totalCalories ?? nutritionResult.totals?.calories ?? '—'}</div>
+                <div className="mt-2 font-medium">Totals</div>
+                <div className="ml-2">Calories: {nutritionResult.totals?.calories ?? '—'}</div>
+                <div className="ml-2">Fat (g): {nutritionResult.totals?.fat_g ?? '—'}</div>
+                <div className="ml-2">Carbs (g): {nutritionResult.totals?.carbs_g ?? '—'}</div>
+                <div className="ml-2">Protein (g): {nutritionResult.totals?.protein_g ?? '—'}</div>
+                <div className="ml-2">Fiber (g): {nutritionResult.totals?.fiber_g ?? '—'}</div>
+                <div className="ml-2">Sugar (g): {nutritionResult.totals?.sugar_g ?? '—'}</div>
+                <div className="ml-2">Sodium (mg): {nutritionResult.totals?.sodium_mg ?? '—'}</div>
+
+                <div className="mt-2 font-medium">Micronutrients</div>
+                <div className="ml-2">Calcium (mg): {nutritionResult.micronutrients?.calcium_mg ?? '—'}</div>
+                <div className="ml-2">Iron (mg): {nutritionResult.micronutrients?.iron_mg ?? '—'}</div>
+                <div className="ml-2">Potassium (mg): {nutritionResult.micronutrients?.potassium_mg ?? '—'}</div>
+                <div className="ml-2">Vitamin C (mg): {nutritionResult.micronutrients?.vitamin_c_mg ?? '—'}</div>
               </div>
             ) : (
-              <div className="mt-2 text-gray-500">No nutrition data.</div>
+              <div className="mt-2 text-gray-500">No nutrition data. Click &quot;Get Nutrition&quot; to estimate nutrition using the Gemini API.</div>
             )}
           </section>
 
