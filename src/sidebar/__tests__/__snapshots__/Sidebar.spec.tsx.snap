@@ -47,6 +47,16 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
         >
           Ingredients
         </h3>
+        <div
+          class="mt-1"
+        >
+          <button
+            aria-label="Localize ingredients"
+            class="px-2 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 focus:outline-none"
+          >
+            Localize
+          </button>
+        </div>
         <details
           class="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2"
         >
@@ -123,11 +133,22 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
       <section
         aria-label="allergen alerts"
       >
-        <h3
-          class="font-medium text-gray-800 dark:text-gray-200"
+        <div
+          class="flex items-center justify-between"
         >
-          Allergen alerts
-        </h3>
+          <h3
+            class="font-medium text-gray-800 dark:text-gray-200"
+          >
+            Allergen alerts
+          </h3>
+          <div>
+            <button
+              class="px-2 py-1 text-xs bg-red-600 text-white rounded"
+            >
+              Detect allergens
+            </button>
+          </div>
+        </div>
         <ul
           class="mt-2 space-y-2"
         >
@@ -202,12 +223,6 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
               />
             </button>
           </div>
-          <button
-            aria-label="Localize ingredients"
-            class="px-3 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-          >
-            Localize
-          </button>
           <button
             aria-label="Suggest alternative ingredients"
             class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"

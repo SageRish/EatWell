@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import prefs from '../utils/prefs/storage'
 import { parseIngredient } from '../utils/parseIngredient'
+import detectAllergens from '../utils/detectAllergens'
+import { canonicalizeIngredient } from '../utils/canonicalizeIngredient'
 
 export type AlertItem = {
   ingredient: string
@@ -44,7 +46,6 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   nutrition,
   alerts = [],
   onRescale,
-  onLocalize,
   onSuggestAlternatives,
   privacyEnabled = false,
   onTogglePrivacy,
@@ -54,6 +55,11 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   const [cleaned, setCleaned] = useState<Record<number, string>>({})
   const [cleaningIngredients, setCleaningIngredients] = useState<Record<number, boolean>>({})
   const [cleanedIngredients, setCleanedIngredients] = useState<Record<number, { quantity?: string; unit?: string; ingredientName?: string }>>({})
+  const [showLocalization, setShowLocalization] = useState(false)
+  const [localizing, setLocalizing] = useState(false)
+  const [selectedCountry, setSelectedCountry] = useState<string>('')
+  const [modelAlerts, setModelAlerts] = useState<AlertItem[]>([])
+  const [detectingAllergens, setDetectingAllergens] = useState(false)
 
   async function injectOriginTrial(token?: string) {
     if (!token) return null
@@ -97,7 +103,7 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
 
       setCleaned((c) => ({ ...c, [idx]: cleanedText }))
       // best-effort cleanup of injected meta tag
-      try {
+  try {
         if (injectedMeta && injectedMeta.parentElement) injectedMeta.parentElement.removeChild(injectedMeta)
       } catch {
         // ignore
@@ -204,6 +210,138 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       await parseIngredientPrompt(i, ingredients[i])
     }
   }
+
+  // Simple fallback mapping for common names when the Prompt API is unavailable.
+  const fallbackLocalizationMap: Record<string, Record<string, string>> = {
+    India: {
+      'cashew nuts': 'kaju',
+      'cashew': 'kaju',
+      'coriander': 'dhania',
+      'cilantro': 'dhania'
+    },
+    Mexico: {
+      'cilantro': 'cilantro',
+      'coriander': 'cilantro'
+    },
+    Japan: {
+      'soy sauce': 'shoyu',
+      'nori': 'nori'
+    }
+  }
+
+  async function localizeIngredientsForCountry(country: string) {
+    if (!ingredients || ingredients.length === 0) return
+    setLocalizing(true)
+    try {
+      const LM = (window as any).LanguageModel
+      // Build a list of ingredient NAMES only (prefer cleaned ingredientName if present)
+      const names = ingredients.map((ing, idx) => {
+        const cleaned = cleanedIngredients[idx]
+        // extract name only: if cleaned exists, use its ingredientName, else use parseIngredient to get name
+        if (cleaned && cleaned.ingredientName) return String(cleaned.ingredientName)
+        const p = parseIngredient(ing || '')
+        return p.ingredientName || ing
+      })
+
+      let mapping: Array<{ original: string; localized: string }> | null = null
+
+      if (LM) {
+        const avail = await LM.availability()
+        if (avail !== 'unavailable') {
+          const session = await LM.create()
+          try {
+            const schema = {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  original: { type: 'string' },
+                  localized: { type: 'string' }
+                },
+                required: ['original', 'localized']
+              }
+            }
+
+            const prompt = `You are a helpful culinary assistant. Given the following ingredient NAMES (one per line), provide the most commonly used local name (in English script) for people from ${country}. Only change the ingredient NAME (do not modify quantities or units). Return a JSON array of objects with keys {original, localized}. If there is no distinct local name, return the original as the localized value.\n\nIngredients:\n${names.join('\n')}`
+
+            try {
+              const result = await session.prompt(prompt, { responseConstraint: schema })
+              mapping = JSON.parse(result)
+            } catch {
+              // fall through to fallback mapping
+            }
+          } finally {
+            try {
+              if (session && typeof session.destroy === 'function') session.destroy()
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      // If mapping is still null, apply fallback heuristics
+      if (!mapping) {
+        mapping = names.map((n) => {
+          const key = (n || '').toLowerCase().trim()
+          const localized = (fallbackLocalizationMap[country] && fallbackLocalizationMap[country][key]) || n
+          return { original: n, localized }
+        })
+      }
+
+      // Apply localized names to cleanedIngredients (only change name field)
+      const updates: Record<number, { quantity?: string; unit?: string; ingredientName?: string }> = {}
+      for (let i = 0; i < names.length; i++) {
+        const mapItem = mapping[i]
+        if (!mapItem) continue
+        const current = cleanedIngredients[i] || {}
+        updates[i] = { ...(current || {}), ingredientName: mapItem.localized }
+      }
+      setCleanedIngredients((c) => ({ ...c, ...updates }))
+    } finally {
+      setLocalizing(false)
+      setShowLocalization(false)
+    }
+  }
+
+  async function detectAllergensForRecipe() {
+    if (!ingredients || ingredients.length === 0) return
+    setDetectingAllergens(true)
+    try {
+      // canonicalize ingredient names
+      const canonicalIngredients = ingredients.map((ing) => canonicalizeIngredient(ing || '').canonicalName)
+
+      const p = await prefs.getPrefs()
+      const userAllergens = (p.allergens && p.allergens.length) ? p.allergens : ['nuts', 'dairy', 'gluten', 'soy', 'egg', 'sesame', 'mustard', 'shellfish', 'lupin', 'peanut']
+
+      // prepare promptFn wrapper for detectAllergens
+      const LM = (window as any).LanguageModel
+      const promptFn = async (promptText: string, opts?: any) => {
+        if (!LM) throw new Error('LanguageModel not available')
+        const avail = await LM.availability()
+        if (avail === 'unavailable') throw new Error('LanguageModel unavailable')
+        const session = await LM.create()
+        try {
+          const res = await session.prompt(promptText, opts)
+          return res
+        } finally {
+          try { if (session && typeof session.destroy === 'function') session.destroy() } catch { /* ignore */ }
+        }
+      }
+
+      const { result } = await detectAllergens(canonicalIngredients, userAllergens, { promptFn })
+      if (result && result.matches) {
+        const mapped: AlertItem[] = result.matches.map((m) => ({ ingredient: m.ingredient, allergen: m.allergen, confidence: m.confidence, reason: m.reason, source: 'model' }))
+        setModelAlerts(mapped)
+      }
+    } catch (e) {
+      // fallback: try a simple ontology-based detection using allergenOntology if available
+      console.warn('Allergen detection failed or unavailable, falling back to no-op', e)
+      setModelAlerts([])
+    } finally {
+      setDetectingAllergens(false)
+    }
+  }
   return (
     <aside
       className={`max-w-md w-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-4 sm:p-6 ${className}`}
@@ -249,6 +387,49 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
 
             <section aria-label="ingredients" className="mt-4">
               <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Ingredients</h3>
+              <div className="mt-1">
+                <button
+                  onClick={() => setShowLocalization((s) => !s)}
+                  className="px-2 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700 focus:outline-none"
+                  aria-label="Localize ingredients"
+                >
+                  {localizing ? 'Localizing…' : 'Localize'}
+                </button>
+                {showLocalization && (
+                  <div className="mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-2 w-48 z-20">
+                    <label className="text-xs text-gray-700 dark:text-gray-200">Select country</label>
+                    <select
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                      className="w-full mt-1 mb-2 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-white text-sm"
+                    >
+                      <option value="">Choose...</option>
+                      <option value="India">India</option>
+                      <option value="Mexico">Mexico</option>
+                      <option value="Japan">Japan</option>
+                      <option value="United Kingdom">United Kingdom</option>
+                      <option value="United States">United States</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (selectedCountry) localizeIngredientsForCountry(selectedCountry)
+                        }}
+                        disabled={!selectedCountry || localizing}
+                        className="flex-1 px-2 py-1 bg-yellow-600 text-white rounded text-sm disabled:opacity-50"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={() => setShowLocalization(false)}
+                        className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
                 <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full ingredient list ({ingredients.length})</summary>
                 {ingredients.length ? (
@@ -378,30 +559,54 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
           </section>
 
           <section aria-label="allergen alerts">
-            <h3 className="font-medium text-gray-800 dark:text-gray-200">Allergen alerts</h3>
-            {alerts.length ? (
-              <ul className="mt-2 space-y-2">
-                {alerts.map((a, idx) => (
-                  <li
-                    key={idx}
-                    className="p-2 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30"
-                    tabIndex={0}
-                    aria-label={`Alert: ${a.allergen} in ${a.ingredient}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-red-800 dark:text-red-200">{a.allergen}</div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300">{a.ingredient}</div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-800 dark:text-gray-200">Allergen alerts</h3>
+              <div>
+                <button
+                  onClick={detectAllergensForRecipe}
+                  disabled={detectingAllergens}
+                  className="px-2 py-1 text-xs bg-red-600 text-white rounded"
+                >
+                  {detectingAllergens ? 'Detecting…' : 'Detect allergens'}
+                </button>
+              </div>
+            </div>
+            {(() => {
+              // merge prop alerts with modelAlerts and dedupe by ingredient+allergen
+              const combined = [...(alerts || []), ...modelAlerts]
+              const unique: AlertItem[] = []
+              const seen = new Set<string>()
+              for (const a of combined) {
+                const key = `${a.ingredient}::${a.allergen}`
+                if (seen.has(key)) continue
+                seen.add(key)
+                unique.push(a)
+              }
+
+              return unique.length ? (
+                <ul className="mt-2 space-y-2">
+                  {unique.map((a, idx) => (
+                    <li
+                      key={idx}
+                      className="p-2 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30"
+                      tabIndex={0}
+                      aria-label={`Alert: ${a.allergen} in ${a.ingredient}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-red-800 dark:text-red-200">{a.allergen}</div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300">{a.ingredient}</div>
+                        </div>
+                        <div className="text-sm text-red-700 dark:text-red-300">{a.confidence ?? '—'}%</div>
                       </div>
-                      <div className="text-sm text-red-700 dark:text-red-300">{a.confidence}%</div>
-                    </div>
-                    {a.reason && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{a.reason}</div>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="mt-2 text-sm text-green-700 dark:text-green-300">No allergens detected.</div>
-            )}
+                      {a.reason && <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{a.reason}</div>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-2 text-sm text-green-700 dark:text-green-300">No allergens detected.</div>
+              )
+            })()}
           </section>
 
           <section aria-label="actions" className="mt-4">
@@ -427,13 +632,7 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
                   />
                 </button>
               </div>
-              <button
-                onClick={onLocalize}
-                className="px-3 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                aria-label="Localize ingredients"
-              >
-                Localize
-              </button>
+              
               <button
                 onClick={onSuggestAlternatives}
                 className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
