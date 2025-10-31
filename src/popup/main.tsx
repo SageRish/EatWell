@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../styles/tailwind.css'
 import OnboardingModal from './OnboardingModal'
+import { summarizeRecipe } from '../utils/summarizer'
 // prefs intentionally not required in compact popup
 
 function Popup() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [loading, setLoading] = useState(true)
   const [recipe, setRecipe] = useState<any | null>(null)
+  const [summaryLines, setSummaryLines] = useState<string[] | null>(null)
   const [activeTabId, setActiveTabId] = useState<number | null>(null)
   // compact popup doesn't use nutrition/alerts directly
 
@@ -25,6 +27,15 @@ function Popup() {
         ;(window as any).chrome.tabs.sendMessage(tabId, { action: 'get_extracted_recipe' }, (resp: any) => {
           if (resp && resp.ok && resp.recipe) {
             setRecipe(resp.recipe)
+            // kick off summarization for popup display
+            ;(async () => {
+              try {
+                const lines = await summarizeRecipe(resp.recipe)
+                setSummaryLines(lines)
+              } catch {
+                // ignore
+              }
+            })()
             // basic summary: first 3 instructions or fallback
             // basic summary computed inline below when rendering
             setLoading(false)
@@ -96,6 +107,13 @@ function Popup() {
               </ul>
             ) : (
               <div className="text-xs text-gray-500">No ingredients detected.</div>
+            )}
+            {summaryLines && (
+              <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                {summaryLines.map((l, i) => (
+                  <div key={i} className="text-sm">{l}</div>
+                ))}
+              </div>
             )}
           </section>
 

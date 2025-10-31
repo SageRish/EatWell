@@ -1,0 +1,1 @@
+// Barebone for future translation capability

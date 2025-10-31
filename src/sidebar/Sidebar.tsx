@@ -52,6 +52,8 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
 }) => {
   const [cleaning, setCleaning] = useState(false)
   const [cleaned, setCleaned] = useState<Record<number, string>>({})
+  const [cleaningIngredients, setCleaningIngredients] = useState<Record<number, boolean>>({})
+  const [cleanedIngredients, setCleanedIngredients] = useState<Record<number, { quantity?: string; unit?: string; ingredientName?: string }>>({})
 
   async function injectOriginTrial(token?: string) {
     if (!token) return null
@@ -64,7 +66,7 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       meta.setAttribute('content', token)
       document.head.appendChild(meta)
       return meta
-    } catch (e) {
+    } catch {
       return null
     }
   }
@@ -97,11 +99,11 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       // best-effort cleanup of injected meta tag
       try {
         if (injectedMeta && injectedMeta.parentElement) injectedMeta.parentElement.removeChild(injectedMeta)
-      } catch (e) {
+      } catch {
         // ignore
       }
-    } catch (err) {
-      console.error('cleanStepText error', err)
+    } catch {
+      console.error('cleanStepText error')
       window.alert('Failed to clean step — see console for details')
     } finally {
       setCleaning(false)
@@ -124,6 +126,82 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       }
     } finally {
       setCleaning(false)
+    }
+  }
+
+  async function parseIngredientPrompt(idx: number, line: string) {
+    setCleaningIngredients((s) => ({ ...s, [idx]: true }))
+    try {
+      const LM = (window as any).LanguageModel
+      if (!LM) {
+        // fallback to local parser
+        const p = parseIngredient(line || '')
+        setCleanedIngredients((c) => ({ ...c, [idx]: { quantity: p.quantity != null ? String(p.quantity) : '', unit: p.unit || '', ingredientName: p.ingredientName || line } }))
+        return
+      }
+
+      const avail = await LM.availability()
+      if (avail === 'unavailable') {
+        const p = parseIngredient(line || '')
+        setCleanedIngredients((c) => ({ ...c, [idx]: { quantity: p.quantity != null ? String(p.quantity) : '', unit: p.unit || '', ingredientName: p.ingredientName || line } }))
+        return
+      }
+
+      const session = await LM.create()
+      try {
+        const schema = {
+          type: 'object',
+          properties: {
+            quantity: { type: ['string', 'number', 'null'] },
+            unit: { type: 'string' },
+            ingredientName: { type: 'string' }
+          },
+          required: ['ingredientName']
+        }
+
+        const prompt = `Parse this normalized ingredient into JSON with keys {quantity, unit, ingredientName}. If quantity is unknown, return null or empty string for quantity. Keep units short (e.g. cup, tsp, g).\n\nIngredient:\n${line}`
+        const result = await session.prompt(prompt, { responseConstraint: schema })
+        let parsed: any = null
+        try {
+          parsed = JSON.parse(result)
+        } catch {
+          // fall through to fallback parser below
+        }
+
+        if (!parsed || typeof parsed.ingredientName !== 'string') {
+          const p = parseIngredient(line || '')
+          setCleanedIngredients((c) => ({ ...c, [idx]: { quantity: p.quantity != null ? String(p.quantity) : '', unit: p.unit || '', ingredientName: p.ingredientName || line } }))
+        } else {
+          setCleanedIngredients((c) => ({ ...c, [idx]: { quantity: parsed.quantity != null ? String(parsed.quantity) : '', unit: parsed.unit || '', ingredientName: parsed.ingredientName || line } }))
+        }
+        } finally {
+        try {
+          if (session && typeof session.destroy === 'function') session.destroy()
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      const p = parseIngredient(line || '')
+      setCleanedIngredients((c) => ({ ...c, [idx]: { quantity: p.quantity != null ? String(p.quantity) : '', unit: p.unit || '', ingredientName: p.ingredientName || line } }))
+    } finally {
+      setCleaningIngredients((s) => {
+        const copy = { ...s }
+        delete copy[idx]
+        return copy
+      })
+    }
+  }
+
+  async function parseAllIngredients() {
+    if (!ingredients || ingredients.length === 0) return
+    for (let i = 0; i < ingredients.length; i++) {
+      // skip if already parsed
+      if (cleanedIngredients[i]) continue
+      // serial to avoid concurrent model downloads
+      // eslint-disable-next-line no-await-in-loop
+      // call parser
+      await parseIngredientPrompt(i, ingredients[i])
     }
   }
   return (
@@ -174,26 +252,61 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
               <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
                 <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full ingredient list ({ingredients.length})</summary>
                 {ingredients.length ? (
-                  <ul className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-2">
-                    {ingredients.map((ing, idx) => {
-                      const parsed = parseIngredient(ing || '')
-                      return (
-                        <li key={idx} className="flex items-start gap-3">
-                          <input
-                            aria-label={`Toggle ingredient ${idx}`}
-                            type="checkbox"
-                            className="mt-1 w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <div className="flex-1">
-                            <div className="text-sm text-gray-900 dark:text-gray-100">{parsed.ingredientName || ing}</div>
-                          </div>
-                          <div className="ml-2">
-                            <div className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200">{parsed.quantity != null ? String(parsed.quantity) + (parsed.unit ? ` ${parsed.unit}` : '') : ''}</div>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-gray-600 dark:text-gray-400">{ingredients.length} ingredients</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={parseAllIngredients}
+                          className="px-2 py-1 text-xs bg-indigo-600 text-white rounded"
+                        >
+                          Clean all ingredients
+                        </button>
+                      </div>
+                    </div>
+                    <ul className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                      {ingredients.map((ing, idx) => {
+                        const parsed = parseIngredient(ing || '')
+                        const cleanedItem = cleanedIngredients[idx]
+                        const ingredientName = cleanedItem?.ingredientName ?? parsed.ingredientName ?? ing
+                        const quantityVal = cleanedItem?.quantity ?? (parsed.quantity != null ? String(parsed.quantity) : '')
+                        const unitVal = cleanedItem?.unit ?? parsed.unit ?? ''
+                        return (
+                          <li key={idx} className="flex items-center gap-3">
+                            <input
+                              aria-label={`Toggle ingredient ${idx}`}
+                              type="checkbox"
+                              className="mt-0.5 w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-normal break-words">{ingredientName}</div>
+                            </div>
+                            <div className="ml-2 flex items-center gap-2">
+                              <input
+                                aria-label={`Quantity for ingredient ${idx}`}
+                                value={quantityVal}
+                                onChange={(e) => setCleanedIngredients((c) => ({ ...c, [idx]: { ...(c[idx] || {}), quantity: e.target.value } }))}
+                                className="w-14 h-8 text-sm px-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200 focus:outline-none"
+                              />
+                              <input
+                                aria-label={`Unit for ingredient ${idx}`}
+                                value={unitVal}
+                                onChange={(e) => setCleanedIngredients((c) => ({ ...c, [idx]: { ...(c[idx] || {}), unit: e.target.value } }))}
+                                className="w-12 h-8 text-sm px-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200 focus:outline-none"
+                              />
+                              <button
+                                onClick={() => parseIngredientPrompt(idx, ing)}
+                                disabled={!!cleaningIngredients[idx]}
+                                className="px-2 h-8 text-sm bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50 flex items-center justify-center"
+                              >
+                                {cleaningIngredients[idx] ? 'Working…' : cleanedItem ? 'Cleaned' : 'Clean'}
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
                 ) : (
                   <div className="text-sm text-gray-500 mt-2">No ingredients detected.</div>
                 )}

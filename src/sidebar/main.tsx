@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import Sidebar, { type AlertItem } from './Sidebar'
+import { summarizeRecipe } from '../utils/summarizer'
 import '../styles/tailwind.css'
 
 function getStateFromSearch(): 'loading' | 'error' | 'ready' {
@@ -41,6 +42,16 @@ function SidebarApp() {
         if (resp && resp.ok && resp.recipe) {
           setRecipe(resp.recipe)
           setState('ready')
+          // request summary using Summarizer API (non-blocking)
+          ;(async () => {
+            try {
+              const lines = await summarizeRecipe(resp.recipe)
+              // store the summary on the recipe object for passing to Sidebar
+              setRecipe((r: any) => ({ ...r, _summaryLines: lines }))
+            } catch {
+              // ignore
+            }
+          })()
         } else {
           setState('error')
         }
@@ -54,6 +65,10 @@ function SidebarApp() {
 
   const summary = React.useMemo(() => {
     if (!recipe) return []
+    // Use any generated summary lines if present
+    if (Array.isArray((recipe as any)._summaryLines) && (recipe as any)._summaryLines.length) {
+      return (recipe as any)._summaryLines as string[]
+    }
     const parts: string[] = []
     if (recipe.servings) parts.push(String(recipe.servings))
     if (Array.isArray(recipe.instructionsRaw) && recipe.instructionsRaw.length) {
