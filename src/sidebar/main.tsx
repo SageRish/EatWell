@@ -95,9 +95,7 @@ function SidebarApp() {
         instructions={recipe?.instructionsRaw || []}
         nutrition={undefined}
         alerts={alerts}
-        onRescale={() => alert('Rescale clicked')}
         onLocalize={() => alert('Localize clicked')}
-        onSuggestAlternatives={() => alert('Suggest Alternatives clicked')}
         privacyEnabled={privacy}
         onTogglePrivacy={(v) => { setPrivacy(v); /* optional: persist */ }}
       />

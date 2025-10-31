@@ -10,18 +10,36 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
     <div
       class="space-y-4"
     >
-      <header>
-        <h2
-          class="text-lg font-bold text-gray-900 dark:text-gray-100"
-          tabindex="0"
-        >
-          Test Recipe
-        </h2>
-        <p
-          class="text-sm text-gray-600 dark:text-gray-400 mt-1"
-        >
-          Quick summary
-        </p>
+      <header
+        class="flex items-start justify-between"
+      >
+        <div>
+          <h2
+            class="text-lg font-bold text-gray-900 dark:text-gray-100"
+            tabindex="0"
+          >
+            Test Recipe
+          </h2>
+          <p
+            class="text-sm text-gray-600 dark:text-gray-400 mt-1"
+          >
+            Quick summary
+          </p>
+        </div>
+        <div>
+          <button
+            aria-label="Open chat"
+            class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+            title="Open chat"
+          >
+            <span
+              aria-hidden="true"
+              class="text-xl"
+            >
+              💬
+            </span>
+          </button>
+        </div>
       </header>
       <section
         aria-label="summary"
@@ -195,12 +213,6 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
         <div
           class="mt-2 flex gap-2 flex-wrap"
         >
-          <button
-            aria-label="Rescale recipe servings"
-            class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            Rescale
-          </button>
           <div
             class="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded"
           >
@@ -219,12 +231,6 @@ exports[`Sidebar component > renders ready state with props and matches snapshot
               />
             </button>
           </div>
-          <button
-            aria-label="Suggest alternative ingredients"
-            class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
-          >
-            Suggest Alternatives
-          </button>
         </div>
       </section>
     </div>

@@ -29,12 +29,11 @@ export type RecipeSidebarProps = {
   instructions?: string[]
   nutrition?: NutritionSummary
   alerts?: AlertItem[]
-  onRescale?: () => void
   onLocalize?: () => void
-  onSuggestAlternatives?: () => void
   privacyEnabled?: boolean
   onTogglePrivacy?: (v: boolean) => void
   className?: string
+  calorieGoal?: number
 }
 
 export const Sidebar: React.FC<RecipeSidebarProps> = ({
@@ -45,11 +44,11 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   instructions = [],
   
   alerts = [],
-  onRescale,
-  onSuggestAlternatives,
+  
   privacyEnabled = false,
   onTogglePrivacy,
   className = ''
+  , calorieGoal
 }) => {
   const [cleaning, setCleaning] = useState(false)
   const [cleaned, setCleaned] = useState<Record<number, string>>({})
@@ -62,6 +61,11 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   const [detectingAllergens, setDetectingAllergens] = useState(false)
   const [calculatingNutrition, setCalculatingNutrition] = useState(false)
   const [nutritionResult, setNutritionResult] = useState<any | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatPrompt, setChatPrompt] = useState('')
+  const [chatReplies, setChatReplies] = useState<Array<{role: 'user'|'assistant'; text: string}>>([])
+  const [sendingChat, setSendingChat] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<'Prompt API'|'Gemini Nano'|'Gemini 2.5 Flash'>('Prompt API')
 
   async function injectOriginTrial(token?: string) {
     if (!token) return null
@@ -440,6 +444,109 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
       setCalculatingNutrition(false)
     }
   }
+
+  function assembleChatContext() {
+    // Ingredients (use cleanedIngredients when available)
+    const ingList = ingredients.map((ing, idx) => {
+      const ci = cleanedIngredients[idx]
+      if (ci && ci.ingredientName) return `${ci.quantity ?? ''} ${ci.unit ?? ''} ${ci.ingredientName}`.trim()
+      const parsed = parseIngredient(ing || '')
+      return `${parsed.quantity != null ? String(parsed.quantity) : ''} ${parsed.unit ?? ''} ${parsed.ingredientName ?? ing}`.trim()
+    })
+
+    const recipeText = [`Title: ${title ?? ''}`, '', 'Instructions:', ...(instructions || [])].join('\n')
+
+    // Allergens: combine alerts + modelAlerts
+    const combinedAlerts = [...(alerts || []), ...modelAlerts]
+    const unique = [] as AlertItem[]
+    const seen = new Set<string>()
+    for (const a of combinedAlerts) {
+      const key = `${a.ingredient}::${a.allergen}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      unique.push(a)
+    }
+
+    const allergenText = unique.map(a => `${a.allergen} in ${a.ingredient} (${a.confidence ?? '—'}%)${a.reason ? ' — ' + a.reason : ''}`).join('\n')
+
+    // Build final context
+    const ctxParts = [] as string[]
+    ctxParts.push('Ingredients:')
+    ctxParts.push(...ingList)
+    ctxParts.push('')
+    ctxParts.push(recipeText)
+    if (allergenText) {
+      ctxParts.push('')
+      ctxParts.push('Allergen alerts:')
+      ctxParts.push(allergenText)
+    }
+    // attach calorieGoal from props if present
+    if (typeof calorieGoal !== 'undefined' && calorieGoal !== null) {
+      ctxParts.push('')
+      ctxParts.push(`Calorie goal: ${calorieGoal}`)
+    }
+
+    return ctxParts.join('\n')
+  }
+
+  async function sendPromptToModel() {
+    if (!chatPrompt || chatPrompt.trim() === '') return
+    setSendingChat(true)
+    // add user message to chat
+    setChatReplies((r) => [...r, { role: 'user', text: chatPrompt }])
+    const context = assembleChatContext()
+    const fullPrompt = `User prompt:\n${chatPrompt}\n\nContext:\n${context}`
+    try {
+      if (selectedModel === 'Prompt API') {
+        const LM = (window as any).LanguageModel
+        if (!LM) {
+          window.alert('Prompt API (LanguageModel) is not available in this browser.')
+          return
+        }
+        const avail = await LM.availability()
+        if (avail === 'unavailable') {
+          window.alert('Prompt API model unavailable on this device/browser.')
+          return
+        }
+        const session = await LM.create()
+        try {
+          const res = await session.prompt(fullPrompt)
+          setChatReplies((r) => [...r, { role: 'assistant', text: String(res) }])
+        } finally {
+          try { if (session && typeof session.destroy === 'function') session.destroy() } catch { /* ignore */ }
+        }
+      } else {
+        // Gemini REST
+        const p = await prefs.getPrefs()
+        const apiKey = (p as any).geminiApiKey || (p as any).usdaApiKey
+        if (!apiKey) {
+          window.alert('No Gemini API key found in Options. Please add your API key in Options before using Gemini models.')
+          return
+        }
+        const modelName = selectedModel === 'Gemini Nano' ? 'gemini-nano' : 'gemini-2.5-flash'
+        const body = {
+          contents: [ { parts: [ { text: fullPrompt } ] } ],
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 } }
+        }
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify(body)
+        })
+        const data = await resp.json()
+        let text = ''
+        try { text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '' } catch { text = '' }
+        if (!text) text = JSON.stringify(data)
+        setChatReplies((r) => [...r, { role: 'assistant', text }])
+      }
+    } catch (e) {
+      console.error('sendPromptToModel failed', e)
+      window.alert('Failed to send prompt — see console for details')
+    } finally {
+      setSendingChat(false)
+      setChatPrompt('')
+    }
+  }
   return (
     <aside
       className={`max-w-md w-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-4 sm:p-6 ${className}`}
@@ -464,12 +571,62 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
 
       {state === 'ready' && (
         <div className="space-y-4">
-          <header>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100" tabIndex={0}>
-              {title}
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Quick summary</p>
+          <header className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100" tabIndex={0}>
+                {title}
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Quick summary</p>
+            </div>
+            <div>
+              <button
+                aria-label="Open chat"
+                title="Open chat"
+                onClick={() => setChatOpen((s) => !s)}
+                className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                  <span className="text-xl" aria-hidden>💬</span>
+              </button>
+            </div>
           </header>
+
+          {chatOpen && (
+            <div role="dialog" aria-label="Recipe chat" className="mt-3 p-3 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-900 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Model</label>
+                <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value as any)} className="ml-1 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm">
+                  <option>Prompt API</option>
+                  <option>Gemini Nano</option>
+                  <option>Gemini 2.5 Flash</option>
+                </select>
+                <div className="ml-auto text-xs text-gray-500 dark:text-gray-400">Context: ingredients · recipe · allergens · calorie goal</div>
+              </div>
+
+              <textarea
+                value={chatPrompt}
+                onChange={(e) => setChatPrompt(e.target.value)}
+                placeholder="Ask the model about substitutions, nutrition, or explain a step..."
+                className="w-full h-20 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-800 dark:text-gray-200 placeholder-gray-500"
+              />
+
+              <div className="flex items-center gap-2 mt-2">
+                <button onClick={sendPromptToModel} disabled={sendingChat} className="px-3 py-1 bg-indigo-600 text-white rounded text-sm disabled:opacity-50">{sendingChat ? 'Sending…' : 'Send'}</button>
+                <button onClick={() => { setChatOpen(false); setChatReplies([]); }} className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm">Close</button>
+              </div>
+
+              <div className="mt-3 max-h-48 overflow-auto pr-2 space-y-3">
+                {chatReplies.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`${m.role === 'user' ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100' : 'bg-indigo-600 dark:bg-indigo-700 text-white'} rounded-lg px-3 py-2 max-w-[85%] shadow-sm`}>
+                      <div className="text-xs font-semibold mb-1">{m.role === 'user' ? 'You' : 'Assistant'}</div>
+                      <div className="text-sm whitespace-pre-wrap">{m.text}</div>
+                    </div>
+                  </div>
+                ))}
+                {!chatReplies.length && (<div className="text-sm text-gray-500">Conversation will appear here.</div>)}
+              </div>
+            </div>
+          )}
 
           <section aria-label="summary" className="text-sm text-gray-700 dark:text-gray-300">
             {summary.length ? (
@@ -734,13 +891,6 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
           <section aria-label="actions" className="mt-4">
             <h3 className="font-medium text-gray-800 dark:text-gray-200">Actions</h3>
             <div className="mt-2 flex gap-2 flex-wrap">
-              <button
-                onClick={onRescale}
-                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                aria-label="Rescale recipe servings"
-              >
-                Rescale
-              </button>
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded">
                 <label className="text-sm">Privacy mode</label>
                 <button
@@ -754,14 +904,6 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
                   />
                 </button>
               </div>
-              
-              <button
-                onClick={onSuggestAlternatives}
-                className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
-                aria-label="Suggest alternative ingredients"
-              >
-                Suggest Alternatives
-              </button>
             </div>
           </section>
         </div>
