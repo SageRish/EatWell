@@ -10,6 +10,7 @@ function OptionsApp() {
   const [dailyCalories, setDailyCalories] = useState('')
   const [telemetry, setTelemetry] = useState(false)
   const [usdaKey, setUsdaKey] = useState('')
+  const [rewriterToken, setRewriterToken] = useState('')
 
   useEffect(() => {
     prefs.getPrefs().then((p) => {
@@ -18,6 +19,7 @@ function OptionsApp() {
       setDailyCalories(p.dietaryGoals?.dailyCalories ? String(p.dietaryGoals.dailyCalories) : '')
       setTelemetry(!!p.telemetryOptIn)
       setUsdaKey(p.usdaApiKey || '')
+      setRewriterToken(p.rewriterToken || '')
       setLoading(false)
     })
   }, [])
@@ -25,7 +27,7 @@ function OptionsApp() {
   async function save() {
     const list = allergens.split(',').map((s) => s.trim()).filter(Boolean)
     const dg = { dailyCalories: dailyCalories ? Number(dailyCalories) : undefined }
-    await prefs.setPrefs({ allergens: list, locale, dietaryGoals: dg as any, telemetryOptIn: telemetry, hasSeenOnboarding: true, usdaApiKey: usdaKey || undefined })
+    await prefs.setPrefs({ allergens: list, locale, dietaryGoals: dg as any, telemetryOptIn: telemetry, hasSeenOnboarding: true, usdaApiKey: usdaKey || undefined, rewriterToken: rewriterToken || undefined })
     alert('Settings saved')
   }
 
@@ -58,6 +60,17 @@ function OptionsApp() {
           placeholder="Enter your USDA API key (leave blank to disable)"
         />
   <div className="text-xs text-gray-500 mt-1">Do not paste provider keys into public repositories. This key is stored in your browser extension storage.</div>
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-sm">Rewriter origin-trial token</label>
+        <input
+          className="w-full border p-2 rounded mt-1"
+          value={rewriterToken}
+          onChange={(e) => setRewriterToken(e.target.value)}
+          placeholder="Paste your Rewriter origin-trial token (keeps it out of the repo)"
+        />
+        <div className="text-xs text-gray-500 mt-1">This token enables the Chrome Rewriter API for your extension origin. It is stored only in your browser and not committed to source control.</div>
       </div>
 
       <div className="mt-4 flex items-center gap-2">

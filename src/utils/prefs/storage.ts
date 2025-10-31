@@ -29,6 +29,8 @@ export type Prefs = {
   telemetryOptIn?: boolean
   // USDA API key provided by the user via Options. Never hardcode provider keys in source.
   usdaApiKey?: string
+  // Rewriter origin-trial token: store securely in browser storage, do NOT commit to repo
+  rewriterToken?: string
   // privacy mode (prevent external calls / persistent writes)
   privacyMode?: boolean
 }
@@ -42,6 +44,7 @@ export const DEFAULT_PREFS: Prefs = {
   , hasSeenOnboarding: false
   , telemetryOptIn: false
   , usdaApiKey: undefined
+  , rewriterToken: undefined
   , privacyMode: false
 }
 

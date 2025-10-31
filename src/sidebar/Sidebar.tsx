@@ -1,4 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
+import prefs from '../utils/prefs/storage'
+import { parseIngredient } from '../utils/parseIngredient'
 
 export type AlertItem = {
   ingredient: string
@@ -48,6 +50,82 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
   onTogglePrivacy,
   className = ''
 }) => {
+  const [cleaning, setCleaning] = useState(false)
+  const [cleaned, setCleaned] = useState<Record<number, string>>({})
+
+  async function injectOriginTrial(token?: string) {
+    if (!token) return null
+    try {
+      // Inject origin-trial meta tag at runtime so token is not stored in the manifest
+      const existing = document.querySelector("meta[http-equiv='origin-trial']")
+      if (existing) return existing as HTMLMetaElement
+      const meta = document.createElement('meta')
+      meta.setAttribute('http-equiv', 'origin-trial')
+      meta.setAttribute('content', token)
+      document.head.appendChild(meta)
+      return meta
+    } catch (e) {
+      return null
+    }
+  }
+
+  async function cleanStepText(idx: number, stepText: string) {
+    try {
+      setCleaning(true)
+      const p = await prefs.getPrefs()
+      const token = p.rewriterToken
+      const injectedMeta = await injectOriginTrial(token)
+
+      // detect Rewriter API
+      if (!(window as any).Rewriter) {
+        window.alert('Rewriter API is not available in this browser/profile. Ensure the origin trial token is set and your browser supports Rewriter.')
+        return
+      }
+
+      const avail = await (window as any).Rewriter.availability()
+      if (avail === 'unavailable') {
+        window.alert('Rewriter model is not available on this device/browser.')
+        return
+      }
+
+      const promptContext = `You are a helpful assistant that rewrites and cleans up cooking instructions. For the provided instruction, fix grammar, remove extraneous words, make it concise and easy to follow, preserve the original meaning, and present it as a short clear imperative step. Keep measurements and ingredient references intact.`
+
+      const rewriter = await (window as any).Rewriter.create({ sharedContext: 'Clean cooking instruction' })
+      const cleanedText = await rewriter.rewrite(stepText, { context: promptContext, format: 'plain-text', tone: 'as-is', length: 'as-is' })
+
+      setCleaned((c) => ({ ...c, [idx]: cleanedText }))
+      // best-effort cleanup of injected meta tag
+      try {
+        if (injectedMeta && injectedMeta.parentElement) injectedMeta.parentElement.removeChild(injectedMeta)
+      } catch (e) {
+        // ignore
+      }
+    } catch (err) {
+      console.error('cleanStepText error', err)
+      window.alert('Failed to clean step — see console for details')
+    } finally {
+      setCleaning(false)
+    }
+  }
+
+  async function cleanAll() {
+    if (!instructions || instructions.length === 0) return
+    setCleaning(true)
+    try {
+      for (let i = 0; i < instructions.length; i++) {
+        // await serially to avoid concurrent model downloads
+        // eslint-disable-next-line no-await-in-loop
+        // skip if already cleaned
+        if (cleaned[i]) continue
+        // eslint-disable-next-line no-await-in-loop
+        // use the same logic as cleanStepText but inline a bit to avoid double state churn
+        const step = instructions[i]
+        await cleanStepText(i, step)
+      }
+    } finally {
+      setCleaning(false)
+    }
+  }
   return (
     <aside
       className={`max-w-md w-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-4 sm:p-6 ${className}`}
@@ -96,10 +174,25 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
               <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
                 <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full ingredient list ({ingredients.length})</summary>
                 {ingredients.length ? (
-                  <ul className="list-disc list-inside mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    {ingredients.map((ing, idx) => (
-                      <li key={idx}>{ing}</li>
-                    ))}
+                  <ul className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    {ingredients.map((ing, idx) => {
+                      const parsed = parseIngredient(ing || '')
+                      return (
+                        <li key={idx} className="flex items-start gap-3">
+                          <input
+                            aria-label={`Toggle ingredient ${idx}`}
+                            type="checkbox"
+                            className="mt-1 w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-900 dark:text-gray-100">{parsed.ingredientName || ing}</div>
+                          </div>
+                          <div className="ml-2">
+                            <div className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-200">{parsed.quantity != null ? String(parsed.quantity) + (parsed.unit ? ` ${parsed.unit}` : '') : ''}</div>
+                          </div>
+                        </li>
+                      )
+                    })}
                   </ul>
                 ) : (
                   <div className="text-sm text-gray-500 mt-2">No ingredients detected.</div>
@@ -111,15 +204,49 @@ export const Sidebar: React.FC<RecipeSidebarProps> = ({
               <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Full recipe</h3>
               <details className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded p-2">
                 <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-100">Show full recipe instructions ({instructions.length} steps)</summary>
-                {instructions.length ? (
-                  <ol className="list-decimal list-inside mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                    {instructions.map((st, idx) => (
-                      <li key={idx}>{st}</li>
-                    ))}
-                  </ol>
-                ) : (
-                  <div className="text-sm text-gray-500 mt-2">No instructions detected.</div>
-                )}
+                  {instructions.length ? (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-gray-600 dark:text-gray-400">{instructions.length} steps</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={cleanAll}
+                            disabled={cleaning}
+                            className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-50"
+                          >
+                            {cleaning ? 'Cleaning…' : 'Clean all steps'}
+                          </button>
+                        </div>
+                      </div>
+                      <ol className="list-decimal list-inside mt-1 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                        {instructions.map((st, idx) => (
+                          <li key={idx} className="flex items-start gap-3">
+                            <input
+                              aria-label={`Toggle step ${idx}`}
+                              type="checkbox"
+                              className="mt-1 w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
+                                {cleaned[idx] ? cleaned[idx] : st}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <button
+                                onClick={() => cleanStepText(idx, st)}
+                                disabled={cleaning || !!cleaned[idx]}
+                                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded disabled:opacity-50"
+                              >
+                                {cleaned[idx] ? 'Cleaned' : cleaning ? 'Working…' : 'Clean'}
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 mt-2">No instructions detected.</div>
+                  )}
               </details>
             </section>
 
