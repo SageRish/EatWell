@@ -108,7 +108,7 @@ What you'll find here
 
 # Quick start
 
-1. Install dependencies
+1. Clone the repo and Install dependencies
 
    npm install
 
