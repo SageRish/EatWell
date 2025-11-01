@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EatWell — Quickstart</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>EatWell — Quickstart & Setup</h1>
+      <p>Build, load and configure the EatWell Chrome extension. This page is generated from the repository and suitable for GitHub Pages.</p>
+    </header>
+
+    <section class="section">
+      <h2>Quick start</h2>
+      <p>Follow these commands from the project root. These examples use PowerShell on Windows; replace with your shell if needed.</p>
+      <h3>1. Install dependencies</h3>
+      <pre><code>npm install</code></pre>
+
+      <h3>2. Dev (Vite)</h3>
+      <p>Run the Vite dev server for local development (HMR):</p>
+      <pre><code>npm run dev</code></pre>
+
+      <h3>3. Build for production</h3>
+      <p>Build produces a ready-to-load extension bundle in <code>dist/</code>:</p>
+      <pre><code>npm run build</code></pre>
+
+      <p class="note">The build script copies <code>src/manifest.json</code> and the <code>src/icons/</code> folder into <code>dist/</code>. Load the <code>dist/</code> folder in Chrome to ensure icons and built assets are available.</p>
+    </section>
+
+    <section class="section">
+      <h2>Setting up the Extension</h2>
+
+      <h3>1. Register required API keys</h3>
+      <ul>
+        <li>If you plan to use Rewriter / Origin Trial features, register an Origin Trial token via Chrome Origin Trials and add it in Options.</li>
+        <li>To use Gemini or other Google AI REST endpoints, provision an API key at AI Studio: <a href="https://aistudio.google.com/app/apikey" target="_blank">https://aistudio.google.com/app/apikey</a>.</li>
+      </ul>
+
+      <h3>2. Load the extension into Chrome (developer mode)</h3>
+      <ol>
+        <li>Open <code>chrome://extensions/</code>.</li>
+        <li>Enable <strong>Developer mode</strong>.</li>
+        <li>Click <strong>Load unpacked</strong> and select the <code>dist/</code> folder from the repo.</li>
+      </ol>
+
+      <h3>3. Configure Extension Options</h3>
+      <p>Open the extension card in <code>chrome://extensions</code> and click <strong>Extension options</strong>, or open the hosted <code>options/index.html</code> page.</p>
+      <ul>
+        <li>Add your allergy information</li>
+        <li>Add calorie goals</li>
+        <li>Paste API keys (masked inputs)</li>
+      </ul>
+      <p>Click <strong>Save</strong>.</p>
+
+      <h3>4. If icons or assets don't appear</h3>
+      <p>Reload the extension from the Extensions page. If issues persist, remove the extension and re-load via <strong>Load unpacked</strong> pointing at <code>dist/</code>. Check the extension "Errors" panel for missing file logs.</p>
+
+    </section>
+
+    <footer class="footer">
+      <p>Repository: <a href="https://github.com/SageRish/EatWell" target="_blank">SageRish / EatWell</a></p>
+      <p>To publish this page on GitHub Pages: go to the repository Settings → Pages and select the <code>main</code> branch and the <code>/docs</code> folder as the source.</p>
+    </footer>
+  </main>
+</body>
+</html>
