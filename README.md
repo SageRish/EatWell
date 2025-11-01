@@ -41,7 +41,7 @@ This allows users to instantly gauge if a recipe suits their time and taste.
 
 ### 🧂 2. Ingredient Localization & Cleaning
 
-Powered by the **Prompt API**, EatWell identifies and reformats ingredient names, converting region-specific terms into standardized forms (e.g., “maida” → “all-purpose flour”).
+Powered by the **Prompt API**, EatWell identifies and reformats ingredient names, converting region-specific terms into standardized forms (e.g., “maida” → “all-purpose flour”) or vice-versa.
 This ensures clarity and consistency across global recipes.
 
 ---
