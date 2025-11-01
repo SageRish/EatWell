@@ -1,17 +1,19 @@
 {
   "manifest_version": 3,
   "name": "EatWell",
-  "version": "0.1.0",
-  "description": "EatWell — helps surface recipe information and healthy choices on recipe sites",
+  "version": "0.7.0",
+  "description": "EatWell - Eat smart. Live well.",
   "icons": {
-    "16": "icons/icon-16.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
+    "16": "icons/logo-16.png",
+    "48": "icons/logo-48.png",
+    "128": "icons/logo-128.png"
   },
   "action": {
     "default_popup": "popup/index.html",
     "default_icon": {
-      "128": "icons/icon-128.png"
+      "16": "icons/logo-16.png",
+      "48": "icons/logo-48.png",
+      "128": "icons/logo-128.png"
     }
   },
   "options_ui": {
