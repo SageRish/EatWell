@@ -36,15 +36,29 @@ Loading into Chrome (extension developer mode)
 3. Click "Load unpacked"
 4. Select the `dist/` folder from this repository
 
+Note: the build script copies `src/manifest.json` and the `src/icons/` folder into `dist/`. Make sure you load the `dist/` folder (not `src/`) so Chrome can find the icons and built assets.
+
+# Setting up the Extension
+
+1. Register the required API keys
+
+- If you plan to use the Rewriter / Origin Trial features, register via the Chrome Origin Trials page and add the token to the extension Options (see project docs for the exact trial URL).
+- To use Gemini (or other Google AI REST endpoints) in the extension you must provision an API key at AI Studio: https://aistudio.google.com/app/apikey and enable any required services for your account.
+
+2. Configure the extension options
+
+- In chrome://extensions click "Details" for the EatWell extension and then click "Extension options" (or open the `options` page from the extension card).
+- In the Options page add:
+   - Your allergy information
+   - Your calorie goals
+   - API keys (the UI stores them in chrome.storage; keys are masked and can be shown temporarily)
+- Click Save.
+
 Notes and acceptance
 
 - The popup UI shows the text "EatWell" (see `src/popup/main.tsx`).
 - The project uses Manifest V3 and TypeScript.
 - `npm run dev` starts Vite and compiles the UI sources (requirements: Node.js installed).
 
-Next steps
-
-- Add icons in `src/icons/` if you want PNGs for the Chrome store.
-- Add tests and CI, and wire an automated builder that zips `dist/` for uploads.
 # EatWell
 EatWell Extension for Chrome Built-In AI hackathon 2025
