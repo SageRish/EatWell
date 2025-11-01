@@ -1,6 +1,101 @@
-# EatWell — Chrome extension scaffold
+# EatWell — Eat smart. Live well.
 
-This repository is a small scaffold for a Chrome Extension (Manifest V3) using React, TypeScript, Vite and Tailwind CSS.
+# About
+
+**EatWell** is an AI-driven Chrome Extension designed to make cooking simpler, healthier, and more inclusive. By combining multiple on-device and cloud-based AI models, EatWell helps users understand, adapt, and personalize any recipe they find online: directly within the browser.
+
+---
+
+## 🧩 Problem We’re Solving
+
+Modern recipe websites are cluttered, inconsistent, and often not inclusive of different dietary needs or cultural ingredient availability.
+Users face several challenges:
+
+* **Managing diets** while ensuring nutritional balance.
+* **Finding ingredient substitutions** for allergies, dietary preferences, or local availability.
+* **Understanding complex recipes** with vague steps or unfamiliar measurements.
+* **Scaling recipes** for different serving sizes without tedious calculations.
+
+**EatWell** solves these problems by combining AI summarization, reasoning, and personalization into one seamless browser extension. It empowers users to:
+
+* Instantly **understand** any recipe.
+* **Adapt** it to their needs.
+* And **chat** naturally with on-device AI for fine-tuning.
+
+---
+
+## ✨ Core Features
+
+### 🧠 1. Recipe Summarization
+
+Uses the **Summarizer API** to provide a concise summary highlighting:
+
+* Serving size
+* Cooking time
+* Cuisine style
+* Expected flavor profile
+
+This allows users to instantly gauge if a recipe suits their time and taste.
+
+---
+
+### 🧂 2. Ingredient Localization & Cleaning
+
+Powered by the **Prompt API**, EatWell identifies and reformats ingredient names, converting region-specific terms into standardized forms (e.g., “maida” → “all-purpose flour”).
+This ensures clarity and consistency across global recipes.
+
+---
+
+### ⚠️ 3. Allergen Detection
+
+The same **Prompt API** detects potential allergens (e.g., nuts, dairy, gluten) and flags them for quick visibility, promoting safer and more inclusive cooking.
+
+---
+
+### 🍳 4. Recipe Simplification
+
+With the **Rewriter API**, complex cooking steps are rephrased into beginner-friendly instructions.
+It reduces ambiguity, clarifies measurements, and keeps the original flavor intact.
+
+---
+
+### 🥗 5. Nutrition Estimation
+
+The **Gemini API** provides detailed nutritional breakdowns, including approximate calories, macros, and essential nutrients, helping users make informed dietary choices.
+
+---
+
+### 💬 6. On-Device AI Chat Assistant
+
+EatWell features a built-in chat window powered by **Gemini Nano (on-device)** or **Gemini 2.5 Flash (cloud)** — depending on user preference.
+Users can naturally ask:
+
+* “Convert this recipe to 3 servings.”
+* “What’s a vegan alternative for cheese?”
+* “Change all measurements to metric.”
+
+This interactive layer replaces rigid buttons with flexible, conversational AI reasoning — all while giving users control over **privacy (Nano)** or **power (Flash)**.
+
+---
+
+## ⚙️ APIs Used
+
+| API                | Purpose                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **Prompt API**     | Ingredient cleaning, localization, allergen detection, and on-device chat functionality |
+| **Summarizer API** | Recipe summarization and extraction of key details                                      |
+| **Rewriter API**   | Recipe simplification and readability enhancement                                       |
+| **Gemini API**     | Nutrition estimation, dietary substitution, serving rescaling, and unit conversion      |
+
+---
+
+## 🌍 Vision
+
+EatWell isn’t just about cooking — it’s about **empowering healthy, inclusive, and personalized eating** for everyone.
+By combining AI understanding with real-world usability, it bridges the gap between **recipe discovery** and **practical meal preparation**, making diet management and cooking simpler for all users — from beginners to health enthusiasts.
+
+---
+
 
 What you'll find here
 
