@@ -106,7 +106,7 @@ What you'll find here
 - `src/contentScript.tsx` — content script (injects a small badge)
 - `vite.config.ts`, `tsconfig.json` — build tool config
 
-Quick start
+# Quick start
 
 1. Install dependencies
 
